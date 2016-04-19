@@ -1,6 +1,4 @@
-
 package javaapplication1;
-
 /**
  *
  * @author tramtran
@@ -10,39 +8,51 @@ import java.util.*;
 
 public class JavaApplication1 {
 
-    private static short EXPRESSION_MAX_LENGTH = 54;
-    private static int ONE_EXPRESSION_LENGTH = 6;
-    private static long NONE=0;
+    private static byte EXPRESSION_MAX_LENGTH = 54;
+    private static byte ONE_EXPRESSION_LENGTH = 6;
+    private static byte NONE = 0;
+
     public static void main(String[] args) {
         try {
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
             String input = bufferedReader.readLine();
             String[] parts = input.split(" ");
-            long[] numbers = new long[parts.length - 1];
-            long target = Long.parseLong(parts[0]);
-            for (int i = 0; i < numbers.length; i++) {
-                numbers[i] = Long.parseLong(parts[i + 1]);
+            if (parts.length > 2 && parts.length < 7) {
+                long[] numbers = new long[parts.length - 1];
+                long target = Long.parseLong(parts[0]);
+                for (int i = 0; i < numbers.length; i++) {
+                    numbers[i] = Long.parseLong(parts[i + 1]);
+                }
+                long exp = getExpression(target, numbers);
+                printExpression(exp, numbers, target);
             }
-            long exp = getExpression(target, numbers);
-            printExpression(exp, numbers,target);
-            
         } catch (NumberFormatException ex) {
             System.out.println("Please input integers!");
         } catch (IOException e) {
         }
     }
+
     //An expression has 64 bits but only 59 bits are used.
     //54 rightmost bits are reserved to remember the arithmetic expression using postfix notation.
     //Each operand or operator in the arithmetic expression takes up 6 bits. 
     //The rightmost bit in the 6-bit indicates whether it is an operand or operator. 1 for operand and 0 for operator.
     //the rest is used as a mask to keep track of the integers that have been used.
-    public static long getExpression(long targetValue, long[] givenNumbers) {
-        int numbersCount = givenNumbers.length;
-        if(!isInRange(targetValue,givenNumbers)) return NONE;
+    public static long getExpression(long target, long[] numbers) {
+        //make sure target is not bigger than the maximum value that given numbers can produce
+        if (!isInRange(target, numbers)) {
+            return NONE;
+        }
+        int numbersCount = numbers.length;
+        double[] givenNumbers = new double[numbersCount];
+        for (int i = 0; i < numbersCount; i++) {
+            givenNumbers[i] = numbers[i];
+        }
+        double targetValue = target;
         //to make sure that all possible combinations have been reached
         //we combine each value and expression that have been reached to the values and expressions that have not been processed
-        HashMap<Long, List<Long>> solvedValues = new HashMap<>();//values and expressions have been reached
+        HashMap<Double, List<Long>> solvedValues = new HashMap<>();//values and expressions have been reached
         Queue<Holder> remainder = new LinkedList<>();//values and expressions have not been processed yet
+
         //Initialize
         for (int i = 0; i < numbersCount; i++) {
             List<Long> l = new ArrayList<>();
@@ -55,12 +65,13 @@ public class JavaApplication1 {
         }
         loop:
         while (!remainder.isEmpty()) {
+
             Holder holder = remainder.poll();
             long curExpression = holder.expression;
             int curMask = generateMaskFromExpression(curExpression);//help keep track of the integers that are in the expression
-            long curValue = holder.value;
+            double curValue = holder.value;
             ArrayList<Holder> solvedValuesCopy = new ArrayList<>();
-            for (long key : solvedValues.keySet()) {
+            for (Double key : solvedValues.keySet()) {
                 List<Long> list = solvedValues.get(key);
                 for (long exp : list) {
                     solvedValuesCopy.add(new Holder(key, exp));
@@ -70,43 +81,37 @@ public class JavaApplication1 {
                 Holder curSolvedValue = solvedValuesCopy.get(i);
                 long expression = curSolvedValue.expression;
                 int mask = generateMaskFromExpression(expression);
-                long value = curSolvedValue.value;
+                double value = curSolvedValue.value;
                 if ((mask & curMask) == 0) {//guarantee no integer is used twice 
                     for (int operator = 0; operator < 6; operator++) {
-                        long newValue = 0;
+                        double newValue = 0;
                         long operatorExp = 1 << (operator + 1);
-                        try {
-                            switch (operator) {
-                                case 0:
-                                    newValue = Math.addExact(curValue, value);
-                                    break;
-                                case 1:
-                                    newValue = Math.subtractExact(curValue, value);
-                                    break;
-                                case 2:
-                                    newValue = Math.subtractExact(value, curValue);
-                                    break;
-                                case 3:
-                                    newValue = Math.multiplyExact(curValue, value);
-                                    break;
-                                case 4:
-                                    newValue = curValue / value;
-                                    if (curValue % value != 0) {
-                                        continue;
-                                    }
-                                    if (curValue==Long.MIN_VALUE&&value==-1) throw new ArithmeticException();
-                                    break;
-                                case 5:
-                                    newValue = value / curValue;
-                                    if (value % curValue != 0) {
-                                        continue;
-                                    }
-                                    if (value==Long.MIN_VALUE&&curValue==-1) throw new ArithmeticException();
-                                    operatorExp = ((1L << 1) | 1) << 1;
-                                    break;
-                            }
-                        } catch (ArithmeticException e) {
-                            continue;
+                        switch (operator) {
+                            case 0:
+                                newValue = curValue + value;
+                                break;
+                            case 1:
+                                newValue = curValue - value;
+                                break;
+                            case 2:
+                                newValue = value - curValue;
+                                break;
+                            case 3:
+                                newValue = curValue * value;
+                                break;
+                            case 4:
+                                if (value == 0) {
+                                    continue;
+                                }
+                                newValue = curValue / value;
+                                break;
+                            case 5:
+                                if (curValue == 0) {
+                                    continue;
+                                }
+                                newValue = value / curValue;
+                                operatorExp = ((1L << 1) | 1) << 1;
+                                break;
                         }
                         long newExpression = 0;
                         //arithmetic expression using postfix notation
@@ -144,24 +149,25 @@ public class JavaApplication1 {
         }
         return NONE;
     }
-    
-    private static boolean isInRange(long target,long[]givenNumbers){
+
+    private static boolean isInRange(long target, long[] givenNumbers) {
         long checker = 1;
         for (int i = 0; i < givenNumbers.length; i++) {
-            
-                long v = Math.abs(givenNumbers[i]);
-                if (v == 1 | v == 0) {
-                    return true;
-                }
-                try {
-                    checker = Math.multiplyExact(checker, v);
-                } catch (ArithmeticException e) {
-                    return true;
-                }
-            
+
+            long v = Math.abs(givenNumbers[i]);
+            if (v == 1 | v == 0) {
+                return true;
+            }
+            try {
+                checker = Math.multiplyExact(checker, v);
+            } catch (ArithmeticException e) {
+                return true;
+            }
+
         }
         return checker >= Math.abs(target);
     }
+
     private static int generateMaskFromExpression(long expression) {
         int ret = (int) (expression >> EXPRESSION_MAX_LENGTH);
         return ret;
@@ -197,10 +203,10 @@ public class JavaApplication1 {
         return toExp | (newMask << EXPRESSION_MAX_LENGTH);
     }
 
-    public static void printExpression(long exp, long[] givenNumbers, long targetNumber) {
+    private static void printExpression(long exp, long[] givenNumbers, long targetValue) {
         if (exp == 0) {
             System.out.println("none");
-            return ;
+            return;
         }
         long temp = exp;
         int count = 9;
@@ -255,19 +261,20 @@ public class JavaApplication1 {
             }
         }
         String expr = st.pop();
-        System.out.println(expr+" = "+String.valueOf(targetNumber));
+
+        System.out.println(expr + " = " + targetValue);
     }
-    
+
     private static boolean isNumber(int value) {
         return (value & 1) == 1;
     }
 
     private static class Holder {
 
-        long value;
+        double value;
         long expression;
 
-        Holder(long value, long expression) {
+        Holder(double value, long expression) {
             this.value = value;
             this.expression = expression;
         }
