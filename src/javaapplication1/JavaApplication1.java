@@ -8,9 +8,9 @@ import java.util.*;
 
 public class JavaApplication1 {
 
-    private static byte EXPRESSION_MAX_LENGTH = 54;
-    private static byte ONE_EXPRESSION_LENGTH = 6;
-    private static byte NONE = 0;
+    public static final byte EXPRESSION_MAX_LENGTH = 54;
+    public static final byte ONE_EXPRESSION_LENGTH = 6;
+    public static final byte NONE = 0;
 
     public static void main(String[] args) {
         try {
